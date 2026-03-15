@@ -1,65 +1,124 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from 'react';
+import { useExpenses } from '../hooks/useExpenses';
+import AddExpenseForm from '../components/AddExpenseForm';
+import ExpenseList from '../components/ExpenseList';
+import StatsCards from '../components/StatsCards';
+import FilterTabs from '../components/FilterTabs';
+import DailyChart from '../charts/DailyChart';
+import MonthlyChart from '../charts/MonthlyChart';
+import TagChart from '../charts/TagChart';
+import { isToday, isYesterday, isLast7Days, isThisMonth } from '../lib/dateUtils';
+
+export default function Dashboard() {
+  const { expenses, addExpense, deleteExpense, importExpenses, stats, allTags } = useExpenses();
+  const [activeFilter, setActiveFilter] = useState('This Month');
+
+  const handleExport = () => {
+    const dataStr = JSON.stringify(expenses, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `money-flow-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target.result);
+        if (Array.isArray(json)) {
+          importExpenses(json);
+          alert('Data imported successfully!');
+        } else {
+          alert('Invalid JSON format. Expected an array of expenses.');
+        }
+      } catch (err) {
+        alert('Failed to parse JSON file.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Reset input so same file can be imported again if needed
+  };
+
+  const filteredExpenses = expenses.filter(expense => {
+    switch (activeFilter) {
+      case 'Today': return isToday(expense.date);
+      case 'Yesterday': return isYesterday(expense.date);
+      case 'Last 7 Days': return isLast7Days(expense.date);
+      case 'This Month': return isThisMonth(expense.date);
+      case 'All Time': default: return true;
+    }
+  });
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
+    <div className="min-h-screen bg-gray-50 text-gray-900 pb-12 font-sans selection:bg-blue-100 selection:text-blue-900">
+      <header className="bg-white border-b border-gray-200 py-4 px-6 md:px-8 mb-8 sticky top-0 z-20 shadow-sm">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+            <span className="bg-black text-white px-2 py-1 rounded-lg text-lg leading-none shadow-sm">₹</span>
+            Money Flow
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:block text-sm font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+              {stats.totalTransactions} Transactions
+            </div>
+            
+            <button 
+              onClick={handleExport}
+              className="text-sm font-medium text-gray-700 bg-white border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 transition-colors"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              Export
+            </button>
+            <label className="cursor-pointer text-sm font-medium text-white bg-black px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors">
+              Import
+              <input 
+                type="file" 
+                accept=".json" 
+                onChange={handleImport} 
+                className="hidden" 
+              />
+            </label>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 md:px-8 flex flex-col gap-6">
+        <StatsCards stats={stats} />
+        
+        <div className="flex flex-col xl:flex-row gap-6">
+          <div className="flex-1 flex flex-col gap-6">
+            <AddExpenseForm onAddExpense={addExpense} allTags={allTags} />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <DailyChart expenses={expenses} />
+              <TagChart expenses={expenses} />
+            </div>
+            
+            <MonthlyChart expenses={expenses} />
+          </div>
+
+          <div className="w-full xl:w-[480px] bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col h-fit sticky top-[88px]">
+            <div className="flex flex-col gap-5 mb-6">
+              <h2 className="text-xl font-bold text-gray-800">History</h2>
+              <FilterTabs activeFilter={activeFilter} setActiveFilter={setActiveFilter} />
+            </div>
+            <ExpenseList expenses={filteredExpenses} onDeleteExpense={deleteExpense} />
+          </div>
         </div>
       </main>
+
+      <footer className="mt-12 pb-6 text-center text-sm text-gray-500">
+        Designed by <a href="https://soumojitshome.vercel.app/" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-900 transition-colors">Soumojit Shome</a>
+      </footer>
     </div>
   );
 }
